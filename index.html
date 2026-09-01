@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Cartellino — Presenze e paghe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --ink:#1c2233; --ink-soft:#4a5064;
+    --paper:#efeee8; --surface:#ffffff;
+    --amber:#e2a63b; --amber-deep:#b9822a; --amber-bg:#fbefda;
+    --success:#3f7a5c; --success-bg:#e3efe8;
+    --danger:#bd4f3b; --danger-bg:#f7e4de;
+    --line:#dcd8cc; --muted:#767b86;
+    --radius:14px;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+    --font-body:'IBM Plex Sans',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--font-body); -webkit-tap-highlight-color:transparent;}
+  button{font-family:var(--font-display); cursor:pointer; border:none; background:var(--surface); color:var(--ink); border-radius:10px; transition:filter .12s, transform .05s;}
+  button:active{transform:scale(.97);}
+  button:disabled{opacity:.5; cursor:default;}
+  input,select{font-family:var(--font-body); border:1px solid var(--line); border-radius:10px; padding:9px 10px; font-size:14px; background:var(--surface); color:var(--ink); outline:none; width:100%;}
+  input:focus,select:focus{border-color:var(--amber-deep);}
+  #app{max-width:520px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; padding-bottom:78px;}
+  .brand{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:18px 18px 8px;}
+  .brand-left{display:flex; align-items:center; gap:10px;}
+  .brand-badge{width:34px; height:34px; border-radius:9px; background:var(--ink); display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--paper);}
+  .brand-title{font-family:var(--font-display); font-weight:700; font-size:19px; letter-spacing:.2px;}
+  .brand-sub{font-size:11px; color:var(--muted); margin-top:-2px;}
+  .card{background:var(--surface); border-radius:var(--radius); border:1px solid var(--line); padding:16px;}
+  .section{padding:0 18px; margin-bottom:16px;}
+  .eyebrow{font-family:var(--font-display); font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:0 0 8px;}
+  .stat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+  .stat{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 10px;}
+  .stat-label{font-size:11px; color:var(--muted); margin:0 0 4px;}
+  .stat-value{font-family:var(--font-mono); font-size:19px; font-weight:600; margin:0;}
+  .emp-row{padding:12px 0; border-bottom:1px solid var(--line);}
+  .emp-row:last-child{border-bottom:none;}
+  .avatar{width:34px; height:34px; border-radius:50%; background:var(--amber-bg); color:var(--amber-deep); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px; flex-shrink:0;}
+  .pill{font-size:11px; padding:2px 8px; border-radius:20px; font-weight:600; white-space:nowrap;}
+  .pill-warn{background:var(--amber-bg); color:var(--amber-deep);}
+  .pill-danger{background:var(--danger-bg); color:var(--danger);}
+  .pill-success{background:var(--success-bg); color:var(--success);}
+  .iconbtn{width:30px; height:30px; padding:0; display:flex; align-items:center; justify-content:center; background:var(--paper); border:1px solid var(--line);}
+  .tabbar{position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--line); display:flex; max-width:520px; margin:0 auto; z-index:20;}
+  .tabbar button{flex:1; background:transparent; border-radius:0; height:64px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-size:10.5px; font-weight:600; color:var(--muted); position:relative;}
+  .tabbar button.active{color:var(--ink);}
+  .tabbar button.active::before{content:''; position:absolute; top:0; left:20%; right:20%; height:3px; background:var(--amber); border-radius:0 0 4px 4px;}
+  .badge-dot{position:absolute; top:8px; right:26%; width:8px; height:8px; border-radius:50%; background:var(--danger); border:2px solid var(--surface);}
+  .punch-btn{width:168px; height:168px; border-radius:50%; margin:0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; background:var(--ink); color:var(--paper); box-shadow:0 0 0 8px var(--amber-bg), 0 0 0 9px var(--line); font-size:15px; font-weight:700;}
+  .punch-btn.out{background:var(--amber-deep);}
+  .clockface{font-family:var(--font-mono); font-size:36px; font-weight:600; letter-spacing:1px; text-align:center;}
+  .toast{display:flex; align-items:center; gap:10px; background:var(--ink); color:var(--paper); border-radius:12px; padding:12px 14px; margin:0 18px 14px;}
+  .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  label.field-label{font-size:11px; color:var(--muted); display:block; margin-bottom:4px; font-weight:600;}
+  .loading-wrap{display:flex; align-items:center; justify-content:center; min-height:100vh; font-family:var(--font-display); color:var(--muted); text-align:center; padding:24px;}
+  .auth-wrap{max-width:360px; margin:60px auto 0; padding:0 18px;}
+  .auth-toggle{display:flex; gap:4px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:4px; margin-bottom:18px;}
+  .auth-toggle button{flex:1; height:36px; font-size:13px; font-weight:600; background:transparent; border-radius:9px;}
+  .auth-toggle button.active{background:var(--ink); color:var(--paper);}
+  .logout-btn{background:transparent; border:1px solid var(--line); font-size:11px; height:30px; padding:0 10px; color:var(--muted); font-family:var(--font-body);}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading-wrap">Caricamento…</div></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, doc, setDoc, updateDoc, getDoc, onSnapshot,
+  collection, addDoc, query, where
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC0RBWF_exKybPr6N4w9HRR31-bFO18Mws",
+  authDomain: "progetto-filippide-2026-2027.firebaseapp.com",
+  projectId: "progetto-filippide-2026-2027",
+  storageBucket: "progetto-filippide-2026-2027.firebasestorage.app",
+  messagingSenderId: "860128374882",
+  appId: "1:860128374882:web:abd71f8386d7433a1e213b"
+};
+const OWNER_EMAIL = "amministrazionefilippide@gmail.com";
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+const { jsPDF } = window.jspdf || {};
+
+const SITES = [
+  { name: "Foro Italico", lat: 41.9311, lon: 12.4564, radius: 250 },
+  { name: "Stadio Paolo Rosi", lat: 41.9341, lon: 12.4893, radius: 200 },
+  { name: "Centro Paralimpico Tre Fontane", lat: 41.8344, lon: 12.4832, radius: 250 }
+];
+
+let currentUser = null;
+let isOwner = false;
+let employees = [];   // owner: all employees. employee: just [myEmployee]
+let myEmployee = null;
+let permits = [];
+let authMode = "login";
+let authError = "";
+let role = "owner";
+let tab = "dash";
+let editingDashId = null;
+let editingMonthId = null;
+let editingPermitId = null;
+let toastMsg = null;
+let toastTimer = null;
+let archive = [];
+let unsubEmployees = null;
+let unsubPermits = null;
+let unsubArchive = null;
+
+function fmtEuro(n){ return "€" + (n||0).toLocaleString("it-IT", { minimumFractionDigits:0, maximumFractionDigits:0 }); }
+function fmtEuro2(n){ return (n||0).toFixed(2).replace(".", ","); }
+function fmtOre(n){ return (n||0).toFixed(1).replace(".", ",") + " h"; }
+function initials(name){ return (name||"?").split(" ").map(p=>p[0]).join(""); }
+function todayDateIt(){ const d=new Date(); return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear(); }
+function monthLabelIt(){ const d=new Date(); return d.toLocaleDateString("it-IT",{month:"long",year:"numeric"}); }
+function todayKey(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function monthKeyNow(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+function isWithinShift(d){
+  const t = d.getHours() + d.getMinutes()/60;
+  return (t >= 9.25 && t <= 13.25) || (t >= 14 && t <= 17.5);
+}
+function daysInMonth(monthKey){
+  const [y,m] = monthKey.split("-").map(Number);
+  return new Date(y, m, 0).getDate();
+}
+
+function distanceMeters(lat1,lon1,lat2,lon2){
+  const R=6371000, toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function pendingApprovals(){ return employees.filter(e=>e.approval==="pending").length; }
+function pendingPermits(){ return permits.filter(p=>p.status==="pending").length; }
+
+function showToast(msg){
+  toastMsg = msg;
+  render();
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ toastMsg=null; render(); }, 6000);
+}
+
+async function updateEmployee(uid, fields){
+  try{ await updateDoc(doc(db,"employees",uid), fields); }
+  catch(e){ console.error("Errore aggiornamento dipendente", e); }
+}
+
+function doClockToggle(emp, onDone){
+  const finish = async (locationLabel, inRange) => {
+    const fields = {};
+    if(emp.working){
+      const [sh,sm] = emp.since.split(":").map(Number);
+      const now = new Date();
+      const hoursWorked = Math.max(0, +((now.getHours()+now.getMinutes()/60) - (sh+sm/60)).toFixed(1));
+      const dKey = emp.dayKey === todayKey() ? emp.dayKey : todayKey();
+      const mKey = emp.monthKey === monthKeyNow() ? emp.monthKey : monthKeyNow();
+      const baseToday = emp.dayKey === todayKey() ? (emp.hoursToday||0) : 0;
+      const baseMonth = emp.monthKey === monthKeyNow() ? (emp.hoursMonth||0) : 0;
+      fields.hoursToday = +(baseToday + hoursWorked).toFixed(1);
+      fields.hoursMonth = +(baseMonth + hoursWorked).toFixed(1);
+      fields.dayKey = dKey; fields.monthKey = mKey;
+      fields.working = false; fields.since = null; fields.location = null; fields.inRange = null; fields.approval = null; fields.withinShift = null;
+    } else {
+      const d = new Date();
+      fields.working = true;
+      fields.since = String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+      fields.location = locationLabel;
+      fields.inRange = inRange;
+      fields.approval = null;
+      fields.withinShift = isWithinShift(d);
+      const mk = monthKeyNow();
+      let days = emp.monthKey===mk ? (emp.daysWorkedThisMonth||[]) : [];
+      const dayNum = d.getDate();
+      if(!days.includes(dayNum)) days = [...days, dayNum];
+      fields.daysWorkedThisMonth = days;
+      if(emp.dayKey !== todayKey()){ fields.hoursToday = 0; fields.dayKey = todayKey(); }
+      if(emp.monthKey !== monthKeyNow()){ fields.hoursMonth = 0; fields.monthKey = monthKeyNow(); }
+    }
+    await updateEmployee(emp.id, fields);
+    onDone();
+  };
+
+  function nearestSite(lat,lon){
+    let best=null, bestDist=Infinity;
+    SITES.forEach(s=>{ const d=distanceMeters(lat,lon,s.lat,s.lon); if(d<bestDist){bestDist=d; best=s;} });
+    return { site:best, dist:bestDist };
+  }
+
+  if(!emp.working && navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+      pos=>{
+        const { site, dist } = nearestSite(pos.coords.latitude, pos.coords.longitude);
+        const inRange = dist <= site.radius;
+        finish(site.name + " (" + Math.round(dist) + " m)", inRange);
+      },
+      ()=>{ finish(SITES[0].name + " (posizione non disponibile)", true); },
+      { timeout: 6000 }
+    );
+  } else if(!emp.working){
+    finish(SITES[0].name + " (posizione non disponibile)", true);
+  } else {
+    finish(null, null);
+  }
+}
+
+function exportPresenzePDF(){
+  if(!jsPDF){ showToast("Impossibile generare il PDF in questo momento."); return; }
+  const doc_ = new jsPDF({ orientation: "landscape" });
+  doc_.setFontSize(14);
+  doc_.text("Presenze — " + monthLabelIt(), 14, 12);
+  const nDays = daysInMonth(monthKeyNow());
+  const head = [["Dipendente", ...Array.from({length:nDays}, (_,i)=>String(i+1))]];
+  const body = employees.map(e => {
+    const days = e.monthKey===monthKeyNow() ? (e.daysWorkedThisMonth||[]) : [];
+    return [e.name, ...Array.from({length:nDays}, (_,i)=> days.includes(i+1) ? "P" : "")];
+  });
+  doc_.autoTable({ head, body, startY: 18, styles:{fontSize:7, cellPadding:1.5, halign:"center"}, columnStyles:{0:{halign:"left", cellWidth:38}} });
+  doc_.save("presenze_" + monthLabelIt().replace(" ","_") + ".pdf");
+}
+function exportOreCostiPDF(){
+  if(!jsPDF){ showToast("Impossibile generare il PDF in questo momento."); return; }
+  const doc_ = new jsPDF();
+  doc_.setFontSize(14);
+  doc_.text("Ore e costo mensile — " + monthLabelIt(), 14, 15);
+  const body = employees.map(e => [e.name, "€ "+fmtEuro2(e.rate), fmtOre(e.hoursMonth), "€ "+fmtEuro2(e.hoursMonth*e.rate)]);
+  const total = employees.reduce((s,e)=>s+e.hoursMonth*e.rate,0);
+  doc_.autoTable({ head: [["Dipendente","Tariffa oraria","Ore totali mese","Costo mensile"]], body, startY: 22, styles:{fontSize:9} });
+  const y = doc_.lastAutoTable.finalY + 10;
+  doc_.setFontSize(12);
+  doc_.text("Totale da pagare: € " + fmtEuro2(total), 14, y);
+  doc_.save("ore_costo_" + monthLabelIt().replace(" ","_") + ".pdf");
+}
+
+function iconSvg(name, size=16){
+  const icons = {
+    dashboard: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+    shield: '<path d="M12 3l7 3v6c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/>',
+    calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+    bell: '<path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/>',
+    pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>',
+    pin: '<path d="M12 22s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/>',
+    check: '<path d="M20 6L9 17l-5-5"/>',
+    x: '<path d="M18 6L6 18M6 6l12 12"/>',
+    mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+    fingerprint: '<path d="M12 2a7 7 0 00-7 7c0 4 2 6 2 9M12 6a5 5 0 015 5c0 5-3 6-3 9M9 10c0 5 1 8 4 11M15 10c0-1.7-1.3-3-3-3s-3 1.3-3 3"/>',
+    logout: '<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    pdf: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 13h1.5a1.5 1.5 0 000-3H8v6M13 10v6M13 13h2M17 10v6"/>'
+  };
+  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(icons[name]||'')+'</svg>';
+}
+
+// ---------- AUTH SCREEN ----------
+function renderAuth(){
+  return `
+    ${renderBrand(false)}
+    <div class="auth-wrap">
+      <div class="auth-toggle">
+        <button data-auth="login" class="${authMode==='login'?'active':''}">Accedi</button>
+        <button data-auth="register" class="${authMode==='register'?'active':''}">Crea account</button>
+      </div>
+      <div class="card">
+        ${authMode==='register' ? `<div style="margin-bottom:10px;"><label class="field-label">Nome e cognome</label><input type="text" id="auth-name" placeholder="Es. Giulia Ferrari"></div>` : ""}
+        <div style="margin-bottom:10px;"><label class="field-label">Email</label><input type="email" id="auth-email" placeholder="nome@esempio.it"></div>
+        <div style="margin-bottom:10px;"><label class="field-label">Password</label><input type="password" id="auth-password" placeholder="Almeno 6 caratteri"></div>
+        ${authError ? `<p style="font-size:12px; color:var(--danger); margin:0 0 10px;">${authError}</p>` : ""}
+        <button id="auth-submit" style="width:100%; height:42px; background:var(--ink); color:var(--paper); font-weight:600;">${authMode==='login'?"Accedi":"Crea account"}</button>
+      </div>
+      <p style="font-size:12px; color:var(--muted); text-align:center; margin-top:14px;">I dipendenti creano il proprio account la prima volta, poi accedono con le stesse credenziali.</p>
+    </div>
+  `;
+}
+
+// ---------- SHARED CHROME ----------
+function renderToast(){
+  if(!toastMsg) return "";
+  return `<div class="toast">${iconSvg('bell',18)}<div style="flex:1; font-size:13px;">${toastMsg}</div>
+    <button id="toast-close" class="iconbtn" style="background:transparent; border-color:rgba(255,255,255,.3); color:var(--paper);">${iconSvg('x',14)}</button></div>`;
+}
+function renderBrand(showLogout){
+  return `<div class="brand">
+    <div class="brand-left">
+      <div class="brand-badge">${iconSvg('fingerprint',18)}</div>
+      <div><div class="brand-title" style="color:var(--ink)">Cartellino</div><div class="brand-sub">${todayDateIt()}</div></div>
+    </div>
+    ${showLogout ? `<button id="logout-btn" class="logout-btn">${iconSvg('logout',12)} Esci</button>` : ""}
+  </div>`;
+}
+
+// ---------- EMPLOYEE APP ----------
+function renderEmployeeApp(){
+  const e = myEmployee;
+  if(!e) return renderBrand(true) + `<div class="section"><div class="card" style="text-align:center; color:var(--muted);">Caricamento profilo…</div></div>`;
+  const now = new Date().toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  let geofenceBadge = "";
+  if(e.working){
+    if(e.inRange===true) geofenceBadge += `<span class="pill pill-success">Entro il raggio consentito</span>`;
+    else if(e.inRange===false) geofenceBadge += `<span class="pill pill-warn">Fuori sede</span>`;
+    if(e.withinShift===false) geofenceBadge += ` <span class="pill pill-warn">Fuori orario</span>`;
+  }
+  const monthHours = e.monthKey === monthKeyNow() ? (e.hoursMonth||0) : 0;
+  return `
+    ${renderBrand(true)}
+    ${renderToast()}
+    <div class="section" style="max-width:360px; margin:0 auto;">
+      <div class="card" style="text-align:center; padding:28px 16px; margin-bottom:16px;">
+        <div style="font-size:12px; color:var(--muted); margin-bottom:2px;">Ora attuale</div>
+        <div class="clockface" id="emp-clock">${now}</div>
+        <div style="height:20px;"></div>
+        <button id="emp-punch" class="punch-btn ${e.working?'out':''}">
+          ${iconSvg(e.working?'logout':'fingerprint',30)}
+          <span>${e.working ? "Esci" : "Timbra"}</span>
+        </button>
+        <div style="margin-top:18px; font-size:13px; color:var(--ink-soft);">${e.working ? "In servizio dalle "+e.since : "Non stai lavorando"}</div>
+        ${e.working ? `<div style="margin-top:4px; font-size:12px; color:var(--muted);">${iconSvg('pin',12)} ${e.location}</div>` : ""}
+        <div style="margin-top:10px;">${geofenceBadge}</div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat" style="grid-column:span 3;">
+          <p class="stat-label" style="text-transform:capitalize;">Ore totali — ${monthLabelIt()}</p>
+          <p class="stat-value">${fmtOre(monthHours)}</p>
+        </div>
+      </div>
+      ${renderEmployeeArchive()}
+      <p style="font-size:12px; color:var(--muted); text-align:center; margin-top:14px;">Orario e posizione vengono registrati automaticamente al tocco.</p>
+    </div>
+  `;
+}
+
+function renderEmployeeArchive(){
+  if(archive.length===0) return "";
+  const pending = archive.filter(a=>!a.confirmed).sort((a,b)=>a.monthKey<b.monthKey?1:-1);
+  const confirmed = archive.filter(a=>a.confirmed).sort((a,b)=>a.monthKey<b.monthKey?1:-1);
+  return `
+    ${pending.map(r=>`
+      <div class="card" style="margin-top:16px; border-color:var(--amber-deep);">
+        <p style="font-weight:600; margin:0 0 4px; text-transform:capitalize;">Riepilogo ${monthKeyLabelIt(r.monthKey)}</p>
+        <p style="font-size:13px; color:var(--muted); margin:0 0 12px;">${fmtOre(r.hours)} · €${fmtEuro2(r.rate)}/h · totale ${fmtEuro(r.cost)}</p>
+        <button data-action="confirm-archive" data-id="${r.id}" style="width:100%; height:40px; background:var(--ink); color:var(--paper); font-weight:600;">${iconSvg('check',14)} Confermo questo riepilogo</button>
+      </div>`).join("")}
+    ${confirmed.length>0 ? `
+      <p class="eyebrow" style="margin-top:18px;">Mesi confermati</p>
+      <div class="card">
+        ${confirmed.map(r=>`
+          <div class="emp-row" style="display:flex; justify-content:space-between; align-items:center; text-transform:capitalize;">
+            <span style="font-size:13px;">${monthKeyLabelIt(r.monthKey)}</span>
+            <span style="font-size:13px; color:var(--muted);">${fmtOre(r.hours)} · ${fmtEuro(r.cost)}</span>
+          </div>`).join("")}
+      </div>` : ""}
+  `;
+}
+
+// ---------- OWNER APP ----------
+function renderOwnerApp(){
+  return `
+    ${renderBrand(true)}
+    ${renderToast()}
+    <div style="flex:1;">
+      ${tab==='dash' ? renderDash() : ""}
+      ${tab==='clock' ? renderClockTab() : ""}
+      ${tab==='permits' ? renderPermits() : ""}
+      ${tab==='month' ? renderMonth() : ""}
+      ${tab==='archive' ? renderArchiveOwner() : ""}
+    </div>
+    <div class="tabbar">
+      ${tabBtn('dash','dashboard','Dashboard')}
+      ${tabBtn('clock','clock','Timbra')}
+      ${tabBtn('permits','calendar','Permessi', pendingPermits())}
+      ${tabBtn('month','calendar','Riepilogo')}
+      ${tabBtn('archive','shield','Archivio')}
+    </div>
+  `;
+}
+function tabBtn(id, icon, label, badge){
+  return `<button data-tab="${id}" class="tab-btn ${tab===id?'active':''}">
+    ${iconSvg(icon,20)}<span>${label}</span>
+    ${badge ? `<span class="badge-dot"></span>` : ""}
+  </button>`;
+}
+
+function renderDash(){
+  const working = employees.filter(e=>e.working).length;
+  const totalHours = employees.reduce((s,e)=> s + (e.dayKey===todayKey() ? (e.hoursToday||0) : 0), 0);
+  const outOfRange = employees.filter(e=>e.working && e.inRange===false).length;
+  if(employees.length===0){
+    return `<div class="section"><div class="card" style="text-align:center; color:var(--muted);">Nessun dipendente ha ancora creato un account. Invia il link dell'app ai tuoi dipendenti: alla prima registrazione compariranno qui.</div></div>`;
+  }
+  return `
+    <div class="section">
+      <div class="stat-grid">
+        <div class="stat"><p class="stat-label">Al lavoro</p><p class="stat-value">${working}/${employees.length}</p></div>
+        <div class="stat"><p class="stat-label">Ore oggi</p><p class="stat-value">${fmtOre(totalHours)}</p></div>
+        <div class="stat"><p class="stat-label">Fuori sede ora</p><p class="stat-value" style="color:${outOfRange>0?'var(--amber-deep)':'var(--ink)'}">${outOfRange}</p></div>
+      </div>
+    </div>
+    <div class="section">
+      <p class="eyebrow">Dipendenti · oggi</p>
+      <div class="card">${employees.map(e=>renderEmpRow(e)).join("")}</div>
+    </div>
+  `;
+}
+
+function renderEmpRow(e){
+  const hoursToday = e.dayKey===todayKey() ? (e.hoursToday||0) : 0;
+  if(editingDashId === e.id){
+    return `<div class="emp-row">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;"><div class="avatar">${initials(e.name)}</div><strong style="font-family:var(--font-display);">${e.name}</strong></div>
+      <div class="form-grid" style="margin-bottom:10px;">
+        <div><label class="field-label">Ore oggi</label><input type="number" step="0.1" min="0" id="edit-dash-hours" value="${hoursToday}"></div>
+        <div><label class="field-label">Tariffa €/h</label><input type="number" step="0.1" min="0" id="edit-dash-rate" value="${e.rate||0}"></div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button data-action="save-dash" data-id="${e.id}" style="flex:1; height:34px; background:var(--ink); color:var(--paper); font-size:13px;">Salva</button>
+        <button data-action="cancel-dash" style="flex:1; height:34px; font-size:13px;">Annulla</button>
+      </div>
+    </div>`;
+  }
+  let sub = e.working ? "Al lavoro dalle "+e.since+" · "+e.location : "Non al lavoro";
+  if(e.working && e.inRange===false) sub += ` <span class="pill pill-warn">fuori sede</span>`;
+  if(e.working && e.withinShift===false) sub += ` <span class="pill pill-warn">fuori orario</span>`;
+  return `<div class="emp-row" style="display:flex; align-items:center; justify-content:space-between;">
+    <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+      <div class="avatar">${initials(e.name)}</div>
+      <div style="min-width:0;">
+        <div style="font-weight:600; font-size:14px;">${e.name}</div>
+        <div style="font-size:12px; color:var(--muted);">${sub} · €${(e.rate||0).toFixed(2)}/h</div>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+      <div style="text-align:right;">
+        <div style="font-family:var(--font-mono); font-weight:600; font-size:14px;">${fmtOre(hoursToday)}</div>
+        <div style="font-size:11px; color:var(--muted);">${fmtEuro(hoursToday*(e.rate||0))}</div>
+      </div>
+      <button class="iconbtn" data-action="edit-dash" data-id="${e.id}">${iconSvg('pencil',13)}</button>
+    </div>
+  </div>`;
+}
+
+function renderClockTab(){
+  if(employees.length===0) return `<div class="section"><div class="card" style="text-align:center; color:var(--muted);">Nessun dipendente registrato ancora.</div></div>`;
+  return `<div class="section">
+    <p style="font-size:13px; color:var(--muted); text-align:center; margin-bottom:14px;">Come titolare puoi timbrare per conto di un dipendente, se serve.</p>
+    <select id="owner-clock-select" style="margin-bottom:14px;">
+      ${employees.map(e=>`<option value="${e.id}">${e.name}</option>`).join("")}
+    </select>
+    <div class="card" style="text-align:center;" id="owner-clock-card"></div>
+  </div>`;
+}
+function renderOwnerClockCard(empId){
+  const e = employees.find(x=>x.id===empId);
+  const now = new Date().toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  let badge = "";
+  if(e.working){
+    if(e.inRange===true) badge += `<span class="pill pill-success">Entro il raggio consentito</span>`;
+    else if(e.inRange===false) badge += `<span class="pill pill-warn">Fuori sede</span>`;
+    if(e.withinShift===false) badge += ` <span class="pill pill-warn">Fuori orario</span>`;
+  }
+  return `
+    <div style="font-size:12px; color:var(--muted);">Ora attuale</div>
+    <div class="clockface" style="font-size:28px;">${now}</div>
+    <div style="margin:14px 0; font-size:14px;">${e.working ? "In servizio dalle "+e.since : "Non al lavoro"}</div>
+    ${e.working ? `<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">${iconSvg('pin',12)} ${e.location}</div>` : ""}
+    <div style="margin-bottom:14px;">${badge}</div>
+    <button id="owner-clock-btn" style="width:100%; height:44px; background:var(--ink); color:var(--paper); font-weight:600;">${e.working?"Timbra uscita":"Timbra entrata"}</button>
+  `;
+}
+
+function renderPermits(){
+  if(employees.length===0) return `<div class="section"><div class="card" style="text-align:center; color:var(--muted);">Nessun dipendente registrato ancora.</div></div>`;
+  return `<div class="section">
+    <div class="card" style="margin-bottom:14px;">
+      <p style="font-weight:600; margin:0 0 12px;">Nuovo permesso orario</p>
+      <div class="form-grid" style="margin-bottom:10px;">
+        <div style="grid-column:1/-1;"><label class="field-label">Dipendente</label>
+          <select id="permit-employee">${employees.map(e=>`<option value="${e.id}">${e.name}</option>`).join("")}</select>
+        </div>
+        <div><label class="field-label">Data</label><input type="date" id="permit-date" value="${new Date().toISOString().slice(0,10)}"></div>
+        <div></div>
+        <div><label class="field-label">Dalle</label><input type="time" id="permit-from" value="10:00"></div>
+        <div><label class="field-label">Alle</label><input type="time" id="permit-to" value="12:00"></div>
+        <div style="grid-column:1/-1;"><label class="field-label">Motivo</label><input type="text" id="permit-reason" placeholder="Es. visita medica"></div>
+      </div>
+      <p id="permit-error" style="font-size:12px; color:var(--danger); display:none; margin:0 0 8px;"></p>
+      <button id="permit-submit" style="width:100%; height:38px; background:var(--ink); color:var(--paper); font-weight:600;">${iconSvg('plus',14)} Aggiungi permesso</button>
+    </div>
+    <p class="eyebrow">Permessi registrati</p>
+    ${permits.length===0 ? `<div class="card" style="text-align:center; color:var(--muted); font-size:14px;">Nessun permesso registrato.</div>` :
+      permits.slice().reverse().map(p=>renderPermitCard(p)).join("")}
+  </div>`;
+}
+function renderPermitCard(p){
+  const [y,m,d] = p.date.split("-");
+  const dateIt = d+"/"+m+"/"+y;
+  const statusMap = { pending:["In attesa","pill-warn"], approved:["Approvato","pill-success"], rejected:["Rifiutato","pill-danger"] };
+  const [label, cls] = statusMap[p.status];
+  if(editingPermitId === p.id){
+    return `<div class="card" style="margin-bottom:10px;">
+      <p style="font-weight:600; margin:0 0 8px;">${p.employeeName}</p>
+      <div class="form-grid" style="margin-bottom:8px;">
+        <div><label class="field-label">Dalle</label><input type="time" id="edit-permit-from" value="${p.from}"></div>
+        <div><label class="field-label">Alle</label><input type="time" id="edit-permit-to" value="${p.to}"></div>
+        <div style="grid-column:1/-1;"><label class="field-label">Motivo</label><input type="text" id="edit-permit-reason" value="${p.reason}"></div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button data-action="save-permit" data-id="${p.id}" style="flex:1; height:34px; background:var(--ink); color:var(--paper); font-size:13px;">Salva</button>
+        <button data-action="cancel-permit" style="flex:1; height:34px; font-size:13px;">Annulla</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="card" style="margin-bottom:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+      <div>
+        <div style="font-weight:600;">${p.employeeName}</div>
+        <div style="font-size:12px; color:var(--muted); margin-top:4px;">${iconSvg('calendar',12)} ${dateIt} · ${p.from}–${p.to}</div>
+        <div style="font-size:12px; color:var(--muted); margin-top:2px;">${p.reason}</div>
+      </div>
+      <span class="pill ${cls}">${label}</span>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      ${p.status==="pending" ? `
+        <button data-action="approve-permit" data-id="${p.id}" style="flex:1; height:32px; background:var(--success-bg); color:var(--success); font-size:13px; font-weight:600;">${iconSvg('check',13)} Approva</button>
+        <button data-action="reject-permit" data-id="${p.id}" style="flex:1; height:32px; background:var(--danger-bg); color:var(--danger); font-size:13px; font-weight:600;">${iconSvg('x',13)} Rifiuta</button>
+      ` : ""}
+      <button data-action="edit-permit" data-id="${p.id}" class="iconbtn">${iconSvg('pencil',13)}</button>
+    </div>
+  </div>`;
+}
+
+function renderMonth(){
+  const total = employees.reduce((s,e)=>s+(e.hoursMonth||0)*(e.rate||0),0);
+  if(employees.length===0) return `<div class="section"><div class="card" style="text-align:center; color:var(--muted);">Nessun dipendente registrato ancora.</div></div>`;
+  const alreadyArchived = archive.some(a=>a.monthKey===monthKeyNow());
+  return `<div class="section">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <p class="eyebrow" style="margin:0; text-transform:capitalize;">${monthLabelIt()}</p>
+      <p style="font-size:11px; color:var(--muted); margin:0;">Tocca ${iconSvg('pencil',10)} per correggere</p>
+    </div>
+    <div class="card">${employees.map(e=>renderMonthRow(e)).join("")}</div>
+    <div style="display:flex; justify-content:space-between; align-items:baseline; padding:14px 4px;">
+      <strong>Totale da pagare</strong>
+      <span style="font-family:var(--font-mono); font-size:20px; font-weight:600;">${fmtEuro(total)}</span>
+    </div>
+    <p class="eyebrow">Esporta</p>
+    <div style="display:flex; gap:8px; margin-bottom:16px;">
+      <button id="export-presenze" style="flex:1; height:42px; font-weight:600; font-size:13px;">${iconSvg('pdf',14)} Presenze PDF</button>
+      <button id="export-costi" style="flex:1; height:42px; font-weight:600; font-size:13px;">${iconSvg('pdf',14)} Ore e costo PDF</button>
+    </div>
+    <div class="card">
+      <p style="font-weight:600; margin:0 0 6px;">Chiusura mensile</p>
+      <p style="font-size:12px; color:var(--muted); margin:0 0 12px;">Archivia i dati di questo mese così restano salvati per sempre e i dipendenti possono confermarli. Puoi ripeterlo per aggiornare l'archivio se correggi qualcosa.</p>
+      <button id="close-month-btn" style="width:100%; height:40px; background:var(--ink); color:var(--paper); font-weight:600;">${iconSvg('shield',14)} ${alreadyArchived ? "Aggiorna archivio del mese" : "Chiudi e archivia il mese"}</button>
+      ${alreadyArchived ? `<p style="font-size:11px; color:var(--success); margin:8px 0 0;">Questo mese è già stato archiviato.</p>` : ""}
+    </div>
+  </div>`;
+}
+function renderMonthRow(e){
+  const hoursMonth = e.monthKey===monthKeyNow() ? (e.hoursMonth||0) : 0;
+  if(editingMonthId === e.id){
+    return `<div class="emp-row">
+      <p style="font-weight:600; margin:0 0 8px;">${e.name}</p>
+      <div class="form-grid" style="margin-bottom:8px;">
+        <div><label class="field-label">Ore totali mese</label><input type="number" step="0.1" min="0" id="edit-month-hours" value="${hoursMonth}"></div>
+        <div><label class="field-label">Tariffa €/h</label><input type="number" step="0.1" min="0" id="edit-month-rate" value="${e.rate||0}"></div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button data-action="save-month" data-id="${e.id}" style="flex:1; height:34px; background:var(--ink); color:var(--paper); font-size:13px;">Salva</button>
+        <button data-action="cancel-month" style="flex:1; height:34px; font-size:13px;">Annulla</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="emp-row" style="display:flex; justify-content:space-between; align-items:center;">
+    <div><div style="font-weight:600; font-size:14px;">${e.name}</div><div style="font-size:12px; color:var(--muted);">${fmtOre(hoursMonth)} · €${(e.rate||0).toFixed(2)}/h</div></div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-family:var(--font-mono); font-weight:600;">${fmtEuro(hoursMonth*(e.rate||0))}</span>
+      <button class="iconbtn" data-action="edit-month" data-id="${e.id}">${iconSvg('pencil',13)}</button>
+    </div>
+  </div>`;
+}
+
+function monthKeyLabelIt(monthKey){
+  const [y,m] = monthKey.split("-").map(Number);
+  const d = new Date(y, m-1, 1);
+  return d.toLocaleDateString("it-IT",{month:"long",year:"numeric"});
+}
+
+function renderArchiveOwner(){
+  const months = [...new Set(archive.map(a=>a.monthKey))].sort().reverse();
+  if(months.length===0){
+    return `<div class="section"><div class="card" style="text-align:center; color:var(--muted);">Nessun mese ancora archiviato. Chiudi il mese dalla scheda Riepilogo per crearne il primo.</div></div>`;
+  }
+  return `<div class="section">
+    <p class="eyebrow">Storico mesi archiviati</p>
+    ${months.map(mk=>{
+      const rows = archive.filter(a=>a.monthKey===mk);
+      const total = rows.reduce((s,r)=>s+(r.cost||0),0);
+      const allConfirmed = rows.every(r=>r.confirmed);
+      return `<div class="card" style="margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <p style="font-weight:600; margin:0; text-transform:capitalize;">${monthKeyLabelIt(mk)}</p>
+          <span class="pill ${allConfirmed?'pill-success':'pill-warn'}">${allConfirmed?"Tutti confermato":"In attesa di conferme"}</span>
+        </div>
+        ${rows.map(r=>`
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); font-size:13px;">
+            <span>${r.employeeName}</span>
+            <span style="display:flex; align-items:center; gap:8px;">
+              <span style="color:var(--muted);">${fmtOre(r.hours)}</span>
+              <span style="font-family:var(--font-mono); font-weight:600;">${fmtEuro(r.cost)}</span>
+              ${r.confirmed ? `<span class="pill pill-success">${iconSvg('check',10)}</span>` : `<span class="pill pill-warn">in attesa</span>`}
+            </span>
+          </div>`).join("")}
+        <div style="display:flex; justify-content:space-between; padding:10px 0 4px; font-weight:600;">
+          <span>Totale</span><span style="font-family:var(--font-mono);">${fmtEuro(total)}</span>
+        </div>
+        <button data-action="download-archive" data-month="${mk}" style="width:100%; height:38px; font-weight:600; font-size:13px; margin-top:8px;">${iconSvg('pdf',14)} Scarica PDF</button>
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
+function exportArchiveMonthPDF(monthKey){
+  if(!jsPDF){ showToast("Impossibile generare il PDF in questo momento."); return; }
+  const rows = archive.filter(a=>a.monthKey===monthKey);
+  const doc_ = new jsPDF();
+  doc_.setFontSize(14);
+  doc_.text("Ore e costo — " + monthKeyLabelIt(monthKey), 14, 15);
+  const body = rows.map(r => [r.employeeName, "€ "+fmtEuro2(r.rate), fmtOre(r.hours), "€ "+fmtEuro2(r.cost), r.confirmed?"Confermato":"In attesa"]);
+  const total = rows.reduce((s,r)=>s+(r.cost||0),0);
+  doc_.autoTable({ head: [["Dipendente","Tariffa oraria","Ore totali","Costo","Conferma"]], body, startY: 22, styles:{fontSize:9} });
+  const y = doc_.lastAutoTable.finalY + 10;
+  doc_.setFontSize(12);
+  doc_.text("Totale da pagare: € " + fmtEuro2(total), 14, y);
+  doc_.save("archivio_" + monthKey + ".pdf");
+}
+
+// ---------- RENDER DISPATCH ----------
+function render(){
+  const app = document.getElementById("app");
+  if(!currentUser){ app.innerHTML = renderAuth(); wireAuthEvents(); return; }
+  app.innerHTML = isOwner ? renderOwnerApp() : renderEmployeeApp();
+  wireAppEvents();
+}
+
+function wireAuthEvents(){
+  document.querySelectorAll("[data-auth]").forEach(b=>b.onclick=()=>{ authMode=b.dataset.auth; authError=""; render(); });
+  document.getElementById("auth-submit").onclick = async ()=>{
+    const email = document.getElementById("auth-email").value.trim();
+    const password = document.getElementById("auth-password").value;
+    const nameInput = document.getElementById("auth-name");
+    const name = nameInput ? nameInput.value.trim() : "";
+    authError = "";
+    if(!email || !password){ authError="Inserisci email e password."; render(); return; }
+    try{
+      if(authMode === "register"){
+        if(email.toLowerCase() !== OWNER_EMAIL.toLowerCase() && !name){ authError="Inserisci il tuo nome e cognome."; render(); return; }
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        if(email.toLowerCase() !== OWNER_EMAIL.toLowerCase()){
+          await setDoc(doc(db,"employees",cred.user.uid), {
+            name, email, rate:0, working:false, since:null, location:null,
+            inRange:null, approval:null, hoursToday:0, hoursMonth:0, dayKey:"", monthKey:"", daysWorkedThisMonth:[]
+          });
+        }
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    }catch(err){
+      authError = translateAuthError(err.code);
+      render();
+    }
+  };
+}
+function translateAuthError(code){
+  const map = {
+    "auth/email-already-in-use": "Questa email ha già un account: prova ad accedere invece di registrarti.",
+    "auth/invalid-email": "Email non valida.",
+    "auth/weak-password": "La password deve avere almeno 6 caratteri.",
+    "auth/wrong-password": "Password errata.",
+    "auth/user-not-found": "Nessun account trovato con questa email.",
+    "auth/invalid-credential": "Email o password non corrette."
+  };
+  return map[code] || "Si è verificato un errore. Riprova.";
+}
+
+function wireAppEvents(){
+  const lb = document.getElementById("logout-btn");
+  if(lb) lb.onclick = ()=> signOut(auth);
+  const tc = document.getElementById("toast-close");
+  if(tc) tc.onclick = ()=>{ toastMsg=null; render(); };
+
+  if(!isOwner){
+    const punch = document.getElementById("emp-punch");
+    if(punch) punch.onclick = ()=>{
+      punch.disabled = true;
+      doClockToggle(myEmployee, ()=>{});
+    };
+    document.querySelectorAll('[data-action="confirm-archive"]').forEach(b=>b.onclick=async()=>{
+      b.disabled = true;
+      try{
+        await updateDoc(doc(db,"monthlyRecords",b.dataset.id), { confirmed:true, confirmedAt: new Date().toISOString() });
+      }catch(err){ console.error(err); b.disabled=false; }
+    });
+    return;
+  }
+
+  document.querySelectorAll(".tab-btn").forEach(b=>b.onclick=()=>{ tab=b.dataset.tab; render(); });
+
+  document.querySelectorAll('[data-action="edit-dash"]').forEach(b=>b.onclick=()=>{ editingDashId=b.dataset.id; render(); });
+  document.querySelectorAll('[data-action="cancel-dash"]').forEach(b=>b.onclick=()=>{ editingDashId=null; render(); });
+  document.querySelectorAll('[data-action="save-dash"]').forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.id;
+    const h=parseFloat(document.getElementById("edit-dash-hours").value);
+    const r=parseFloat(document.getElementById("edit-dash-rate").value);
+    const fields = {};
+    if(!isNaN(h)&&h>=0){ fields.hoursToday = +h.toFixed(1); fields.dayKey = todayKey(); }
+    if(!isNaN(r)&&r>=0) fields.rate = +r.toFixed(2);
+    editingDashId=null;
+    await updateEmployee(id, fields);
+    render();
+  });
+
+  if(tab==="clock"){
+    const sel = document.getElementById("owner-clock-select");
+    const card = document.getElementById("owner-clock-card");
+    let currentId = sel.value;
+    const paint = ()=>{ card.innerHTML = renderOwnerClockCard(currentId); document.getElementById("owner-clock-btn").onclick=()=>{
+      const btn = document.getElementById("owner-clock-btn");
+      btn.disabled=true; btn.textContent="Rilevo posizione…";
+      doClockToggle(employees.find(e=>e.id===currentId), ()=>{});
+    }; };
+    sel.onchange = ()=>{ currentId=sel.value; paint(); };
+    paint();
+  }
+
+  document.querySelectorAll('[data-action="approve"]').forEach(b=>b.onclick=async()=>{
+    await updateEmployee(b.dataset.id, { approval:"approved" }); render();
+  });
+  document.querySelectorAll('[data-action="reject"]').forEach(b=>b.onclick=async()=>{
+    await updateEmployee(b.dataset.id, { approval:"rejected", working:false, since:null, location:null, inRange:null }); render();
+  });
+
+  document.querySelectorAll('[data-action="edit-month"]').forEach(b=>b.onclick=()=>{ editingMonthId=b.dataset.id; render(); });
+  document.querySelectorAll('[data-action="cancel-month"]').forEach(b=>b.onclick=()=>{ editingMonthId=null; render(); });
+  document.querySelectorAll('[data-action="save-month"]').forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.id;
+    const h=parseFloat(document.getElementById("edit-month-hours").value);
+    const r=parseFloat(document.getElementById("edit-month-rate").value);
+    const fields = {};
+    if(!isNaN(h)&&h>=0){ fields.hoursMonth = +h.toFixed(1); fields.monthKey = monthKeyNow(); }
+    if(!isNaN(r)&&r>=0) fields.rate = +r.toFixed(2);
+    editingMonthId=null;
+    await updateEmployee(id, fields);
+    render();
+  });
+
+  const expP = document.getElementById("export-presenze");
+  if(expP) expP.onclick = exportPresenzePDF;
+  const expC = document.getElementById("export-costi");
+  if(expC) expC.onclick = exportOreCostiPDF;
+
+  const closeMonthBtn = document.getElementById("close-month-btn");
+  if(closeMonthBtn) closeMonthBtn.onclick = async ()=>{
+    closeMonthBtn.disabled = true;
+    const mk = monthKeyNow();
+    try{
+      for(const e of employees){
+        const hours = e.monthKey===mk ? (e.hoursMonth||0) : 0;
+        const rate = e.rate||0;
+        const existing = archive.find(a=>a.monthKey===mk && a.employeeId===e.id);
+        await setDoc(doc(db,"monthlyRecords", mk+"_"+e.id), {
+          employeeId: e.id, employeeName: e.name, monthKey: mk,
+          hours, rate, cost: +(hours*rate).toFixed(2),
+          confirmed: existing ? existing.confirmed : false,
+          confirmedAt: existing ? existing.confirmedAt : null
+        });
+      }
+      showToast("Mese archiviato correttamente.");
+    }catch(err){ console.error(err); showToast("Errore durante l'archiviazione."); }
+    closeMonthBtn.disabled = false;
+  };
+
+  document.querySelectorAll('[data-action="download-archive"]').forEach(b=>b.onclick=()=>{
+    exportArchiveMonthPDF(b.dataset.month);
+  });
+
+  const permitSubmit = document.getElementById("permit-submit");
+  if(permitSubmit) permitSubmit.onclick = async ()=>{
+    const employeeId = document.getElementById("permit-employee").value;
+    const employeeName = employees.find(e=>e.id===employeeId)?.name || "";
+    const date = document.getElementById("permit-date").value;
+    const from = document.getElementById("permit-from").value;
+    const to = document.getElementById("permit-to").value;
+    const reason = document.getElementById("permit-reason").value.trim();
+    const err = document.getElementById("permit-error");
+    const toH = t=>{ const [h,m]=t.split(":").map(Number); return h+m/60; };
+    if(!date||!from||!to||!reason){ err.textContent="Compila data, orario e motivo."; err.style.display="block"; return; }
+    if(toH(to)<=toH(from)){ err.textContent="L'orario di fine deve essere dopo l'inizio."; err.style.display="block"; return; }
+    await addDoc(collection(db,"permits"), { employeeId, employeeName, date, from, to, reason, status:"approved" });
+    render();
+  };
+  document.querySelectorAll('[data-action="approve-permit"]').forEach(b=>b.onclick=async()=>{
+    await updateDoc(doc(db,"permits",b.dataset.id), { status:"approved" }); render();
+  });
+  document.querySelectorAll('[data-action="reject-permit"]').forEach(b=>b.onclick=async()=>{
+    await updateDoc(doc(db,"permits",b.dataset.id), { status:"rejected" }); render();
+  });
+  document.querySelectorAll('[data-action="edit-permit"]').forEach(b=>b.onclick=()=>{ editingPermitId=b.dataset.id; render(); });
+  document.querySelectorAll('[data-action="cancel-permit"]').forEach(b=>b.onclick=()=>{ editingPermitId=null; render(); });
+  document.querySelectorAll('[data-action="save-permit"]').forEach(b=>b.onclick=async()=>{
+    const f=document.getElementById("edit-permit-from").value;
+    const t=document.getElementById("edit-permit-to").value;
+    const r=document.getElementById("edit-permit-reason").value.trim();
+    const fields={}; if(f) fields.from=f; if(t) fields.to=t; if(r) fields.reason=r;
+    editingPermitId=null;
+    await updateDoc(doc(db,"permits",b.dataset.id), fields);
+    render();
+  });
+}
+
+setInterval(()=>{
+  const el = document.getElementById("emp-clock");
+  if(el) el.textContent = new Date().toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+}, 1000);
+
+// ---------- AUTH STATE ----------
+onAuthStateChanged(auth, (user) => {
+  if(unsubEmployees){ unsubEmployees(); unsubEmployees=null; }
+  if(unsubPermits){ unsubPermits(); unsubPermits=null; }
+  if(unsubArchive){ unsubArchive(); unsubArchive=null; }
+  currentUser = user;
+
+  if(!user){
+    isOwner = false; myEmployee = null; employees = []; permits = []; archive = [];
+    render();
+    return;
+  }
+
+  isOwner = user.email && user.email.toLowerCase() === OWNER_EMAIL.toLowerCase();
+
+  if(isOwner){
+    tab = "dash";
+    unsubEmployees = onSnapshot(collection(db,"employees"), snap=>{
+      employees = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+      render();
+    });
+    unsubPermits = onSnapshot(collection(db,"permits"), snap=>{
+      permits = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+      render();
+    });
+    unsubArchive = onSnapshot(collection(db,"monthlyRecords"), snap=>{
+      archive = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+      render();
+    });
+    render();
+  } else {
+    unsubEmployees = onSnapshot(doc(db,"employees",user.uid), snap=>{
+      myEmployee = snap.exists() ? { id:user.uid, ...snap.data() } : null;
+      employees = myEmployee ? [myEmployee] : [];
+      render();
+    });
+    unsubArchive = onSnapshot(query(collection(db,"monthlyRecords"), where("employeeId","==",user.uid)), snap=>{
+      archive = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+      render();
+    });
+    render();
+  }
+});
+</script>
+</body>
+</html>
