@@ -6,8 +6,7 @@
 <title>Cartellino — Presenze e paghe</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --ink:#1c2233; --ink-soft:#4a5064;
@@ -95,7 +94,15 @@ const OWNER_EMAIL = "amministrazionefilippide@gmail.com";
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const auth = getAuth(fbApp);
-const { jsPDF } = window.jspdf || {};
+function surname(name){ const parts=(name||"").trim().split(/\s+/); return parts[parts.length-1]||""; }
+function sortedBySurname(list){ return [...list].sort((a,b)=> surname(a.name||a.employeeName).localeCompare(surname(b.name||b.employeeName), 'it', {sensitivity:'base'})); }
+function downloadExcel(filename, sheetName, aoa){
+  if(!window.XLSX){ showToast("Impossibile generare il file Excel in questo momento."); return; }
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, filename);
+}
 
 const SITES = [
   { name: "Foro Italico", lat: 41.9311, lon: 12.4564, radius: 250 },
@@ -219,32 +226,21 @@ function doClockToggle(emp, onDone){
   }
 }
 
-function exportPresenzePDF(){
-  if(!jsPDF){ showToast("Impossibile generare il PDF in questo momento."); return; }
-  const doc_ = new jsPDF({ orientation: "landscape" });
-  doc_.setFontSize(14);
-  doc_.text("Presenze — " + monthLabelIt(), 14, 12);
+function exportPresenzeExcel(){
   const nDays = daysInMonth(monthKeyNow());
-  const head = [["Dipendente", ...Array.from({length:nDays}, (_,i)=>String(i+1))]];
-  const body = employees.map(e => {
+  const header = ["Dipendente", ...Array.from({length:nDays}, (_,i)=>String(i+1))];
+  const rows = sortedBySurname(employees).map(e => {
     const days = e.monthKey===monthKeyNow() ? (e.daysWorkedThisMonth||[]) : [];
     return [e.name, ...Array.from({length:nDays}, (_,i)=> days.includes(i+1) ? "P" : "")];
   });
-  doc_.autoTable({ head, body, startY: 18, styles:{fontSize:7, cellPadding:1.5, halign:"center"}, columnStyles:{0:{halign:"left", cellWidth:38}} });
-  doc_.save("presenze_" + monthLabelIt().replace(" ","_") + ".pdf");
+  downloadExcel("presenze_" + monthKeyNow() + ".xlsx", "Presenze", [header, ...rows]);
 }
-function exportOreCostiPDF(){
-  if(!jsPDF){ showToast("Impossibile generare il PDF in questo momento."); return; }
-  const doc_ = new jsPDF();
-  doc_.setFontSize(14);
-  doc_.text("Ore e costo mensile — " + monthLabelIt(), 14, 15);
-  const body = employees.map(e => [e.name, "€ "+fmtEuro2(e.rate), fmtOre(e.hoursMonth), "€ "+fmtEuro2(e.hoursMonth*e.rate)]);
-  const total = employees.reduce((s,e)=>s+e.hoursMonth*e.rate,0);
-  doc_.autoTable({ head: [["Dipendente","Tariffa oraria","Ore totali mese","Costo mensile"]], body, startY: 22, styles:{fontSize:9} });
-  const y = doc_.lastAutoTable.finalY + 10;
-  doc_.setFontSize(12);
-  doc_.text("Totale da pagare: € " + fmtEuro2(total), 14, y);
-  doc_.save("ore_costo_" + monthLabelIt().replace(" ","_") + ".pdf");
+function exportOreCostiExcel(){
+  const header = ["Dipendente","Tariffa oraria (€)","Ore totali mese","Costo mensile (€)"];
+  const rows = sortedBySurname(employees).map(e => [e.name, +(e.rate||0).toFixed(2), +(e.hoursMonth||0).toFixed(1), +((e.hoursMonth||0)*(e.rate||0)).toFixed(2)]);
+  const total = employees.reduce((s,e)=>s+(e.hoursMonth||0)*(e.rate||0),0);
+  rows.push(["","","Totale", +total.toFixed(2)]);
+  downloadExcel("ore_costo_" + monthKeyNow() + ".xlsx", "Ore e costo", [header, ...rows]);
 }
 
 function iconSvg(name, size=16){
@@ -412,7 +408,7 @@ function renderDash(){
     </div>
     <div class="section">
       <p class="eyebrow">Dipendenti · oggi</p>
-      <div class="card">${employees.map(e=>renderEmpRow(e)).join("")}</div>
+      <div class="card">${sortedBySurname(employees).map(e=>renderEmpRow(e)).join("")}</div>
     </div>
   `;
 }
@@ -458,7 +454,7 @@ function renderClockTab(){
   return `<div class="section">
     <p style="font-size:13px; color:var(--muted); text-align:center; margin-bottom:14px;">Come titolare puoi timbrare per conto di un dipendente, se serve.</p>
     <select id="owner-clock-select" style="margin-bottom:14px;">
-      ${employees.map(e=>`<option value="${e.id}">${e.name}</option>`).join("")}
+      ${sortedBySurname(employees).map(e=>`<option value="${e.id}">${e.name}</option>`).join("")}
     </select>
     <div class="card" style="text-align:center;" id="owner-clock-card"></div>
   </div>`;
@@ -489,7 +485,7 @@ function renderPermits(){
       <p style="font-weight:600; margin:0 0 12px;">Nuovo permesso orario</p>
       <div class="form-grid" style="margin-bottom:10px;">
         <div style="grid-column:1/-1;"><label class="field-label">Dipendente</label>
-          <select id="permit-employee">${employees.map(e=>`<option value="${e.id}">${e.name}</option>`).join("")}</select>
+          <select id="permit-employee">${sortedBySurname(employees).map(e=>`<option value="${e.id}">${e.name}</option>`).join("")}</select>
         </div>
         <div><label class="field-label">Data</label><input type="date" id="permit-date" value="${new Date().toISOString().slice(0,10)}"></div>
         <div></div>
@@ -552,15 +548,15 @@ function renderMonth(){
       <p class="eyebrow" style="margin:0; text-transform:capitalize;">${monthLabelIt()}</p>
       <p style="font-size:11px; color:var(--muted); margin:0;">Tocca ${iconSvg('pencil',10)} per correggere</p>
     </div>
-    <div class="card">${employees.map(e=>renderMonthRow(e)).join("")}</div>
+    <div class="card">${sortedBySurname(employees).map(e=>renderMonthRow(e)).join("")}</div>
     <div style="display:flex; justify-content:space-between; align-items:baseline; padding:14px 4px;">
       <strong>Totale da pagare</strong>
       <span style="font-family:var(--font-mono); font-size:20px; font-weight:600;">${fmtEuro(total)}</span>
     </div>
     <p class="eyebrow">Esporta</p>
     <div style="display:flex; gap:8px; margin-bottom:16px;">
-      <button id="export-presenze" style="flex:1; height:42px; font-weight:600; font-size:13px;">${iconSvg('pdf',14)} Presenze PDF</button>
-      <button id="export-costi" style="flex:1; height:42px; font-weight:600; font-size:13px;">${iconSvg('pdf',14)} Ore e costo PDF</button>
+      <button id="export-presenze" style="flex:1; height:42px; font-weight:600; font-size:13px;">${iconSvg('pdf',14)} Presenze Excel</button>
+      <button id="export-costi" style="flex:1; height:42px; font-weight:600; font-size:13px;">${iconSvg('pdf',14)} Ore e costo Excel</button>
     </div>
     <div class="card">
       <p style="font-weight:600; margin:0 0 6px;">Chiusura mensile</p>
@@ -608,7 +604,7 @@ function renderArchiveOwner(){
   return `<div class="section">
     <p class="eyebrow">Storico mesi archiviati</p>
     ${months.map(mk=>{
-      const rows = archive.filter(a=>a.monthKey===mk);
+      const rows = sortedBySurname(archive.filter(a=>a.monthKey===mk));
       const total = rows.reduce((s,r)=>s+(r.cost||0),0);
       const allConfirmed = rows.every(r=>r.confirmed);
       return `<div class="card" style="margin-bottom:12px;">
@@ -628,25 +624,19 @@ function renderArchiveOwner(){
         <div style="display:flex; justify-content:space-between; padding:10px 0 4px; font-weight:600;">
           <span>Totale</span><span style="font-family:var(--font-mono);">${fmtEuro(total)}</span>
         </div>
-        <button data-action="download-archive" data-month="${mk}" style="width:100%; height:38px; font-weight:600; font-size:13px; margin-top:8px;">${iconSvg('pdf',14)} Scarica PDF</button>
+        <button data-action="download-archive" data-month="${mk}" style="width:100%; height:38px; font-weight:600; font-size:13px; margin-top:8px;">${iconSvg('pdf',14)} Scarica Excel</button>
       </div>`;
     }).join("")}
   </div>`;
 }
 
-function exportArchiveMonthPDF(monthKey){
-  if(!jsPDF){ showToast("Impossibile generare il PDF in questo momento."); return; }
-  const rows = archive.filter(a=>a.monthKey===monthKey);
-  const doc_ = new jsPDF();
-  doc_.setFontSize(14);
-  doc_.text("Ore e costo — " + monthKeyLabelIt(monthKey), 14, 15);
-  const body = rows.map(r => [r.employeeName, "€ "+fmtEuro2(r.rate), fmtOre(r.hours), "€ "+fmtEuro2(r.cost), r.confirmed?"Confermato":"In attesa"]);
+function exportArchiveMonthExcel(monthKey){
+  const rows = sortedBySurname(archive.filter(a=>a.monthKey===monthKey));
+  const header = ["Dipendente","Tariffa oraria (€)","Ore totali","Costo (€)","Conferma"];
+  const body = rows.map(r => [r.employeeName, +(r.rate||0).toFixed(2), +(r.hours||0).toFixed(1), +(r.cost||0).toFixed(2), r.confirmed?"Confermato":"In attesa"]);
   const total = rows.reduce((s,r)=>s+(r.cost||0),0);
-  doc_.autoTable({ head: [["Dipendente","Tariffa oraria","Ore totali","Costo","Conferma"]], body, startY: 22, styles:{fontSize:9} });
-  const y = doc_.lastAutoTable.finalY + 10;
-  doc_.setFontSize(12);
-  doc_.text("Totale da pagare: € " + fmtEuro2(total), 14, y);
-  doc_.save("archivio_" + monthKey + ".pdf");
+  body.push(["","","Totale", +total.toFixed(2), ""]);
+  downloadExcel("archivio_" + monthKey + ".xlsx", monthKey, [header, ...body]);
 }
 
 // ---------- RENDER DISPATCH ----------
@@ -769,9 +759,9 @@ function wireAppEvents(){
   });
 
   const expP = document.getElementById("export-presenze");
-  if(expP) expP.onclick = exportPresenzePDF;
+  if(expP) expP.onclick = exportPresenzeExcel;
   const expC = document.getElementById("export-costi");
-  if(expC) expC.onclick = exportOreCostiPDF;
+  if(expC) expC.onclick = exportOreCostiExcel;
 
   const closeMonthBtn = document.getElementById("close-month-btn");
   if(closeMonthBtn) closeMonthBtn.onclick = async ()=>{
@@ -795,7 +785,7 @@ function wireAppEvents(){
   };
 
   document.querySelectorAll('[data-action="download-archive"]').forEach(b=>b.onclick=()=>{
-    exportArchiveMonthPDF(b.dataset.month);
+    exportArchiveMonthExcel(b.dataset.month);
   });
 
   const permitSubmit = document.getElementById("permit-submit");
