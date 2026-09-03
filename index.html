@@ -418,6 +418,10 @@ function renderEmpRow(e){
   if(editingDashId === e.id){
     return `<div class="emp-row">
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;"><div class="avatar">${initials(e.name)}</div><strong style="font-family:var(--font-display);">${e.name}</strong></div>
+      <div style="margin-bottom:10px;">
+        <label class="field-label">Nome e cognome</label>
+        <input type="text" id="edit-dash-name" value="${e.name}" placeholder="Nome Cognome">
+      </div>
       <div class="form-grid" style="margin-bottom:10px;">
         <div><label class="field-label">Ore oggi</label><input type="number" step="0.1" min="0" id="edit-dash-hours" value="${hoursToday}"></div>
         <div><label class="field-label">Tariffa €/h</label><input type="number" step="0.1" min="0" id="edit-dash-rate" value="${e.rate||0}"></div>
@@ -716,9 +720,11 @@ function wireAppEvents(){
     const id=b.dataset.id;
     const h=parseFloat(document.getElementById("edit-dash-hours").value);
     const r=parseFloat(document.getElementById("edit-dash-rate").value);
+    const n=document.getElementById("edit-dash-name").value.trim();
     const fields = {};
     if(!isNaN(h)&&h>=0){ fields.hoursToday = +h.toFixed(1); fields.dayKey = todayKey(); }
     if(!isNaN(r)&&r>=0) fields.rate = +r.toFixed(2);
+    if(n) fields.name = n;
     editingDashId=null;
     await updateEmployee(id, fields);
     render();
