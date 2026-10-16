@@ -73,7 +73,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, doc, setDoc, updateDoc, getDoc, onSnapshot,
+  getFirestore, doc, setDoc, updateDoc, deleteDoc, getDoc, onSnapshot,
   collection, addDoc, query, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
@@ -120,6 +120,7 @@ let authError = "";
 let role = "owner";
 let tab = "dash";
 let editingDashId = null;
+let confirmDeleteId = null;
 let editingMonthId = null;
 let editingPermitId = null;
 let toastMsg = null;
@@ -430,6 +431,15 @@ function renderEmpRow(e){
         <button data-action="save-dash" data-id="${e.id}" style="flex:1; height:34px; background:var(--ink); color:var(--paper); font-size:13px;">Salva</button>
         <button data-action="cancel-dash" style="flex:1; height:34px; font-size:13px;">Annulla</button>
       </div>
+      ${confirmDeleteId === e.id ? `
+        <div style="margin-top:12px; padding:10px; border:1px solid var(--danger); border-radius:10px; background:var(--danger-bg);">
+          <p style="margin:0 0 8px; font-size:13px; color:var(--danger);">Eliminare definitivamente <strong>${e.name}</strong>? Non potrà più timbrare. Gli archivi dei mesi già chiusi restano salvati.</p>
+          <div style="display:flex; gap:8px;">
+            <button data-action="confirm-delete-emp" data-id="${e.id}" style="flex:1; height:34px; background:var(--danger); color:#fff; font-size:13px; font-weight:600;">Sì, elimina</button>
+            <button data-action="abort-delete-emp" style="flex:1; height:34px; font-size:13px;">No</button>
+          </div>
+        </div>` : `
+        <button data-action="ask-delete-emp" data-id="${e.id}" style="width:100%; height:34px; margin-top:12px; background:transparent; border:1px solid var(--danger); color:var(--danger); font-size:13px;">Elimina dipendente</button>`}
     </div>`;
   }
   let sub = e.working ? "Al lavoro dalle "+e.since+" · "+e.location : "Non al lavoro";
@@ -715,7 +725,17 @@ function wireAppEvents(){
   document.querySelectorAll(".tab-btn").forEach(b=>b.onclick=()=>{ tab=b.dataset.tab; render(); });
 
   document.querySelectorAll('[data-action="edit-dash"]').forEach(b=>b.onclick=()=>{ editingDashId=b.dataset.id; render(); });
-  document.querySelectorAll('[data-action="cancel-dash"]').forEach(b=>b.onclick=()=>{ editingDashId=null; render(); });
+  document.querySelectorAll('[data-action="cancel-dash"]').forEach(b=>b.onclick=()=>{ editingDashId=null; confirmDeleteId=null; render(); });
+  document.querySelectorAll('[data-action="ask-delete-emp"]').forEach(b=>b.onclick=()=>{ confirmDeleteId=b.dataset.id; render(); });
+  document.querySelectorAll('[data-action="abort-delete-emp"]').forEach(b=>b.onclick=()=>{ confirmDeleteId=null; render(); });
+  document.querySelectorAll('[data-action="confirm-delete-emp"]').forEach(b=>b.onclick=async()=>{
+    b.disabled = true;
+    try{
+      await deleteDoc(doc(db,"employees",b.dataset.id));
+      editingDashId = null; confirmDeleteId = null;
+      showToast("Dipendente eliminato.");
+    }catch(err){ console.error(err); b.disabled=false; showToast("Errore: impossibile eliminare il dipendente."); }
+  });
   document.querySelectorAll('[data-action="save-dash"]').forEach(b=>b.onclick=async()=>{
     const id=b.dataset.id;
     const h=parseFloat(document.getElementById("edit-dash-hours").value);
